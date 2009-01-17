@@ -1,6 +1,6 @@
 package net.soemirno.xmlUtil
 
-import xml.Utility.{trim, trimProper}
+import xml.Utility.trim
 import _root_.scala.xml._
 import _root_.scala.xml.transform.{RuleTransformer, RewriteRule}
 
@@ -13,35 +13,38 @@ object mergeDuplicatesSpec extends Specification {
 
   def updateFigure(ipcFigure: Elem): NodeSeq = {
 
-    val updateServiceBulletins = new RewriteRule {
-
+    val removeDuplicateSbRule = new RewriteRule {
       override def transform(n: Node): NodeSeq = n match {
-        case e: Elem if (e).label == "item" =>
-          new Elem(e.prefix, e.label,
-            e.attributes,
-            e.scope,
-            normalizeServiceBulletins((trim(e) \ "_").toList) : _*)       
+        case e :Elem if (e.label == "item") => removeDuplicateSbFrom(e)
         case n => n
       }
     }
 
-    val transformer = new RuleTransformer(updateServiceBulletins)
-    transformer.transform(ipcFigure)
+    new RuleTransformer(removeDuplicateSbRule).transform(ipcFigure)
   }
 
-  def normalizeServiceBulletins(list: List[Node]): List[Node] =
-    {
-      if (list.length == 1 || list.isEmpty) {
-        list
-      } else {
-        if ((list.head.label == "sbcdata") && (list.head \ "sbc") == (list.tail.head \ "sbc")) {
-          list.head :: normalizeServiceBulletins(list.tail.tail)
-        } else {
-          list.head :: normalizeServiceBulletins(list.tail)
-        }
-      }
-    }
-  
+  def removeDuplicateSbFrom(elem: Elem) = {
+    val childs = (trim(elem) \ "_").toList
+    Elem(elem.prefix, elem.label, elem.attributes, elem.scope, duplicatesSbRemoved(childs) : _*)
+  }
+
+  def duplicatesSbRemoved(list: List[Node]): List[Node] = {
+    if (list.isEmpty || list.tail.isEmpty)
+      list
+    else {
+      val normalizedList = removeAnyDoubleSbHead(list);
+      normalizedList.head :: duplicatesSbRemoved(normalizedList.tail)
+    }  
+  }
+
+  def removeAnyDoubleSbHead(list: List[Node]) = {
+    val hasDoubleHead = (list.head.label == "sbcdata") && (list.head \ "sbc") == (list.tail.head \ "sbc")
+    if (hasDoubleHead)
+      list.tail.tail
+    else
+      list.tail    
+  }
+
   val ipcItem: Elem =
   <item>
     <effect effrg=" "/>
@@ -62,7 +65,7 @@ object mergeDuplicatesSpec extends Specification {
   </item>
 
   "normalized sb list has one sbcdata removed" in {
-    val normalizedItem = normalizeServiceBulletins((trim(ipcItem) \ "_").toList)
+    val normalizedItem = duplicatesSbRemoved((trim(ipcItem) \ "_").toList)
     normalizedItem.size must_== 5
   }
 
@@ -92,6 +95,4 @@ object mergeDuplicatesSpec extends Specification {
   "normalized list has '3' as third element" in {
     (normalizeList(listWithDuplicates))(2) must_== 3
   }
-
-  
 }
