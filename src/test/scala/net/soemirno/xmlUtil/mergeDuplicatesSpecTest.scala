@@ -40,9 +40,9 @@ object mergeDuplicatesSpec extends Specification {
   def removeAnyDoubleSbHead(list: List[Node]) = {
     val hasDoubleHead = (list.head.label == "sbcdata") && (list.head \ "sbc") == (list.tail.head \ "sbc")
     if (hasDoubleHead)
-      list.tail.tail
+      list.tail
     else
-      list.tail    
+      list    
   }
 
   val ipcItem: Elem =
