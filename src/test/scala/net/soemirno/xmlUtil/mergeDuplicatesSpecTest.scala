@@ -36,11 +36,11 @@ object mergeDuplicatesSpec extends Specification {
   }
 
   "sb is replaced in item" in {
-    (AtaDocument.updateFigure(ipcItem) \ "sbcdata").length must_== 1
+    (AtaDocument.removeDuplicateSbFromFigure(ipcItem) \ "sbcdata").length must_== 1
   }
 
   "sb has effectivity of '097097 099099' " in {
-    (AtaDocument.updateFigure(ipcItem) \\ "sbcdata" \\ "@effrg").text must_== "097097 099099"
+    (AtaDocument.removeDuplicateSbFromFigure(ipcItem) \\ "sbcdata" \\ "@effrg").text must_== "097097 099099"
   }
 
   val listWithDuplicates = List(1, 1, 2, 2, 3, 4, 4)
