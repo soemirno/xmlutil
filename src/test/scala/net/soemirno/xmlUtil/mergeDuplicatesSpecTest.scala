@@ -12,37 +12,42 @@ class mergeDuplicatesSpecTest extends Runner(mergeDuplicatesSpec) with JUnit
 object mergeDuplicatesSpec extends Specification {
 
   def updateFigure(ipcFigure: Elem): NodeSeq = {
+    new RuleTransformer(distinctSbRule).transform(ipcFigure)
+  }
 
-    val removeDuplicateSbRule = new RewriteRule {
-      override def transform(n: Node): NodeSeq = n match {
-        case e :Elem if (e.label == "item") => removeDuplicateSbFrom(e)
-        case n => n
-      }
+  val distinctSbRule = new RewriteRule {
+    override def transform(n: Node): NodeSeq = n match {
+      case e :Elem if (e.label == "item") => removeDuplicateSbFrom(e)
+      case n => n
     }
-
-    new RuleTransformer(removeDuplicateSbRule).transform(ipcFigure)
   }
-
+  
   def removeDuplicateSbFrom(elem: Elem) = {
-    val childs = (trim(elem) \ "_").toList
-    Elem(elem.prefix, elem.label, elem.attributes, elem.scope, duplicatesSbRemoved(childs) : _*)
+    val childs = listWithUniqueSb(elem.child.toList)
+    Elem(elem.prefix, elem.label, elem.attributes, elem.scope, childs : _*)
   }
 
-  def duplicatesSbRemoved(list: List[Node]): List[Node] = {
-    if (list.isEmpty || list.tail.isEmpty)
+  def listWithUniqueSb(list: List[Node]): List[Node] = {
+    if (list.length < 2)
       list
     else {
-      val normalizedList = removeAnyDoubleSbHead(list);
-      normalizedList.head :: duplicatesSbRemoved(normalizedList.tail)
+      list.head :: listWithUniqueSb(trimmedSbTail(list))
     }  
   }
 
-  def removeAnyDoubleSbHead(list: List[Node]) = {
-    val hasDoubleHead = (list.head.label == "sbcdata") && (list.head \ "sbc") == (list.tail.head \ "sbc")
-    if (hasDoubleHead)
-      list.tail
+  def trimmedSbTail(list: List[Node]) = {
+    val trimmedTail = trimmedPcDataTail(list)
+    if ((list.head.label == "sbcdata") && (list.head \ "sbc") == (trimmedTail.head \ "sbc"))
+      trimmedTail.tail
     else
-      list    
+      list.tail
+  }
+
+  def trimmedPcDataTail(list: List[Node]) = {
+    if (list.tail.head.label.equals("#PCDATA"))
+      list.tail.tail
+    else
+      list.tail
   }
 
   val ipcItem: Elem =
@@ -64,13 +69,17 @@ object mergeDuplicatesSpec extends Specification {
     </sbcdata>
   </item>
 
-  "normalized sb list has one sbcdata removed" in {
-    val normalizedItem = duplicatesSbRemoved((trim(ipcItem) \ "_").toList)
-    normalizedItem.size must_== 5
+  "sb list has duplicate sbcdata removed" in {
+    val normalizedItem = listWithUniqueSb(ipcItem.child.toList)
+    normalizedItem.size must_== 11
   }
 
   "sb is replaced in item" in {
-    Console.println(new PrettyPrinter(80, 2).format(<root> {updateFigure(ipcItem)} </root>))
+    (updateFigure(ipcItem) \ "sbcdata").length must_== 1
+  }
+
+  "sb has effectivity of '097097 099099' " in {
+    (updateFigure(ipcItem) \\ "sbcdata" \\ "@effrg").text must_== "097097 099099"
   }
 
   val listWithDuplicates = List(1, 1, 2, 2, 3, 4, 4)
