@@ -10,8 +10,10 @@ class AtaDocument (source: Elem) extends Elem(source.prefix, source.label,
 }
 
 object AtaDocument {
-  def updateFigure(ipcFigure: Elem): NodeSeq = {
-    new RuleTransformer(distinctSbRule).transform(ipcFigure)
+  def updateFigure(figure: Elem): Elem = {
+    val n = new RuleTransformer(distinctSbRule).transform(figure)
+    Elem(figure.prefix, figure.label, figure.attributes, figure.scope, n.first.child.toList : _*)
+
   }
 
   val distinctSbRule = new RewriteRule {
@@ -36,7 +38,7 @@ object AtaDocument {
 
   def trimmedSbTail(list: List[Node]) = {
     val trimmedTail = trimmedPcDataTail(list)
-    if ((list.head.label == "sbcdata") && (list.head \ "sbc") == (trimmedTail.head \ "sbc"))
+    if ((list.head.label == "sbcdata")&& (!trimmedTail.isEmpty) && (list.head \ "sbc") == (trimmedTail.head \ "sbc"))
       trimmedTail.tail
     else
       list.tail
