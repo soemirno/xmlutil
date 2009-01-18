@@ -7,12 +7,14 @@ import xml.Utility.trim
 
 class AtaDocument (source: Elem) extends Elem(source.prefix, source.label,
   source.attributes, source.scope, source.child : _*) {
+}
 
-  def normalized(): NodeSeq = {
-    new RuleTransformer(removeDuplicateSbRule).transform(this)
+object AtaDocument {
+  def updateFigure(ipcFigure: Elem): NodeSeq = {
+    new RuleTransformer(distinctSbRule).transform(ipcFigure)
   }
 
-  val removeDuplicateSbRule = new RewriteRule {
+  val distinctSbRule = new RewriteRule {
     override def transform(n: Node): NodeSeq = n match {
       case e :Elem if (e.label == "item") => removeDuplicateSbFrom(e)
       case n => n
@@ -20,25 +22,31 @@ class AtaDocument (source: Elem) extends Elem(source.prefix, source.label,
   }
 
   def removeDuplicateSbFrom(elem: Elem) = {
-    val childs = (trim(elem) \ "_").toList
-    Elem(elem.prefix, elem.label, elem.attributes, elem.scope, duplicatesSbRemoved(childs) : _*)
+    val childs = listWithUniqueSb(elem.child.toList)
+    Elem(elem.prefix, elem.label, elem.attributes, elem.scope, childs : _*)
   }
 
-  def duplicatesSbRemoved(list: List[Node]): List[Node] = {
-    if (list.isEmpty || list.tail.isEmpty)
+  def listWithUniqueSb(list: List[Node]): List[Node] = {
+    if (list.length < 2)
       list
     else {
-      val normalizedList = removeAnyDoubleSbHead(list);
-      normalizedList.head :: duplicatesSbRemoved(normalizedList.tail)
+      list.head :: listWithUniqueSb(trimmedSbTail(list))
     }
   }
 
-  def removeAnyDoubleSbHead(list: List[Node]) = {
-    val hasDoubleHead = (list.head.label == "sbcdata") && (list.head \ "sbc") == (list.tail.head \ "sbc")
-    if (hasDoubleHead)
-      list.tail
+  def trimmedSbTail(list: List[Node]) = {
+    val trimmedTail = trimmedPcDataTail(list)
+    if ((list.head.label == "sbcdata") && (list.head \ "sbc") == (trimmedTail.head \ "sbc"))
+      trimmedTail.tail
     else
-      list
+      list.tail
+  }
+
+  def trimmedPcDataTail(list: List[Node]) = {
+    if (list.tail.head.label.equals("#PCDATA"))
+      list.tail.tail
+    else
+      list.tail
   }
 
 }

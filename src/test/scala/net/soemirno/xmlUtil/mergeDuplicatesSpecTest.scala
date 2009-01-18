@@ -11,45 +11,6 @@ class mergeDuplicatesSpecTest extends Runner(mergeDuplicatesSpec) with JUnit
 
 object mergeDuplicatesSpec extends Specification {
 
-  def updateFigure(ipcFigure: Elem): NodeSeq = {
-    new RuleTransformer(distinctSbRule).transform(ipcFigure)
-  }
-
-  val distinctSbRule = new RewriteRule {
-    override def transform(n: Node): NodeSeq = n match {
-      case e :Elem if (e.label == "item") => removeDuplicateSbFrom(e)
-      case n => n
-    }
-  }
-  
-  def removeDuplicateSbFrom(elem: Elem) = {
-    val childs = listWithUniqueSb(elem.child.toList)
-    Elem(elem.prefix, elem.label, elem.attributes, elem.scope, childs : _*)
-  }
-
-  def listWithUniqueSb(list: List[Node]): List[Node] = {
-    if (list.length < 2)
-      list
-    else {
-      list.head :: listWithUniqueSb(trimmedSbTail(list))
-    }  
-  }
-
-  def trimmedSbTail(list: List[Node]) = {
-    val trimmedTail = trimmedPcDataTail(list)
-    if ((list.head.label == "sbcdata") && (list.head \ "sbc") == (trimmedTail.head \ "sbc"))
-      trimmedTail.tail
-    else
-      list.tail
-  }
-
-  def trimmedPcDataTail(list: List[Node]) = {
-    if (list.tail.head.label.equals("#PCDATA"))
-      list.tail.tail
-    else
-      list.tail
-  }
-
   val ipcItem: Elem =
   <item>
     <effect effrg=" "/>
@@ -70,16 +31,16 @@ object mergeDuplicatesSpec extends Specification {
   </item>
 
   "sb list has duplicate sbcdata removed" in {
-    val normalizedItem = listWithUniqueSb(ipcItem.child.toList)
+    val normalizedItem = Atadocument.listWithUniqueSb(ipcItem.child.toList)
     normalizedItem.size must_== 11
   }
 
   "sb is replaced in item" in {
-    (updateFigure(ipcItem) \ "sbcdata").length must_== 1
+    (AtaDocument.updateFigure(ipcItem) \ "sbcdata").length must_== 1
   }
 
   "sb has effectivity of '097097 099099' " in {
-    (updateFigure(ipcItem) \\ "sbcdata" \\ "@effrg").text must_== "097097 099099"
+    (AtaDocument.updateFigure(ipcItem) \\ "sbcdata" \\ "@effrg").text must_== "097097 099099"
   }
 
   val listWithDuplicates = List(1, 1, 2, 2, 3, 4, 4)
