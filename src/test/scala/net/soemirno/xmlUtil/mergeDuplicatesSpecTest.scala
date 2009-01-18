@@ -3,14 +3,17 @@ package net.soemirno.xmlUtil
 import xml.Utility.trim
 import _root_.scala.xml._
 import _root_.scala.xml.transform.{RuleTransformer, RewriteRule}
+import scala.io.Source 
 
 import org.specs.runner.{Runner, JUnit}
 import org.specs.Specification
-
+import org.slf4j.{Logger,LoggerFactory}
 class mergeDuplicatesSpecTest extends Runner(mergeDuplicatesSpec) with JUnit
 
 object mergeDuplicatesSpec extends Specification {
+  val LOGGER = LoggerFactory.getLogger(this.getClass)
 
+    
   val ipcItem: Elem =
   <item>
     <effect effrg=" "/>
@@ -31,7 +34,7 @@ object mergeDuplicatesSpec extends Specification {
   </item>
 
   "sb list has duplicate sbcdata removed" in {
-    val normalizedItem = Atadocument.listWithUniqueSb(ipcItem.child.toList)
+    val normalizedItem = AtaDocument.listWithUniqueSb(ipcItem.child.toList)
     normalizedItem.size must_== 11
   }
 
@@ -43,6 +46,26 @@ object mergeDuplicatesSpec extends Specification {
     (AtaDocument.removeDuplicateSbFromFigure(ipcItem) \\ "sbcdata" \\ "@effrg").text must_== "097097 099099"
   }
 
+  "should read files from list" in {
+    LOGGER.info("test")
+    for (filename :String <- Source.fromFile("/Users/soemirno/F27_FSB_in_proof_final.txt").getLines)
+        convertFile(filename.trim)
+  }
+
+
+  def convertFile(filename :String) = {
+      LOGGER.info("Starting converting: " + filename)
+      if (new java.io.File("/tmp/new/" + filename).exists) {
+          val loadnode = xml.XML.loadFile("/tmp/new/" + filename)
+          scala.xml.XML.saveFull("/tmp/temp/" + filename, loadnode, "UTF-8", true, null)
+          val loadReversNode = xml.XML.loadFile("/tmp/temp/" + filename)
+          scala.xml.XML.saveFull("/tmp/converted/" + filename,
+              AtaDocument.removeDuplicateSbFromFigure(loadReversNode), "UTF-8", true, null)
+           LOGGER.info("Finished converting: " + filename)
+      } else
+          LOGGER.error("=============>" + filename + " does not exists")
+
+  }
   val listWithDuplicates = List(1, 1, 2, 2, 3, 4, 4)
 
   def normalizeList(list: List[int]): List[int] =
