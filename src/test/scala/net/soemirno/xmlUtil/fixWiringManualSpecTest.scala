@@ -1,62 +1,31 @@
 package net.soemirno.xmlUtil
 
-
 import _root_.scala.xml.transform.{RuleTransformer, RewriteRule}
+import _root_.scala.xml.{Elem, NodeBuffer, NodeSeq}
 import java.util.regex.Pattern.Node
-import _root_.scala.xml.{Elem, NodeSeq}
+import java.io.File
 import org.specs.runner.{Runner, JUnit}
 import org.specs.Specification
 import org.slf4j.{Logger,LoggerFactory}
+import scala.xml.parsing.ConstructingParser
 
 class fixWiringManualSpecTest extends Runner(fixWiringManualSpec) with JUnit
 
 object fixWiringManualSpec extends Specification {
     val LOGGER = LoggerFactory.getLogger(this.getClass)
 
-    "should read unrevised" in {
-//        val deletedKeys = findDeletedKeys("/Users/soemirno/Desktop/publication/100/wm/_shadowfolder/20080901-finalprint-ata2100.xml")
-//        val returnedElements = findReturnedElements("/Users/soemirno/Desktop/publication/100/wm/_unrevised.xml", deletedKeys)
+    "should fix returned elements" in {
+        val deletedKeys = findDeletedKeys("/Users/soemirno/Desktop/publication/50/wm/_shadowfolder/20081201-finalprint-ata2100.xml")
+        val returnedElements = findReturnedElements("/Users/soemirno/Desktop/publication/50/wm/_unrevised.xml", deletedKeys)
+        val sourceFile = "/Users/soemirno/Desktop/publication/50/wm/20090301.xml"
+        val tempFile = "/Users/soemirno/Desktop/withAddedBreaks.xml"
+        val outputFile = "/Users/soemirno/Desktop/fixed.xml" 
 
-        val filename = "/Users/soemirno/Desktop/publication/100/wm/20081201.xml"
-        LOGGER.info("Starting fixing: " + filename)
-        val wmDoc = xml.XML.loadFile( filename)
-
-//val wmDoc =
-//<subject>
-//<graphic key="W0438532" chg="R" revdate="20081201" chapnbr="22" gtype="SS" pagenbr="159" sectnbr="11" subjnbr="23">
-//<effect effrg="549549 559559" />
-//<title>FLIGHT CONT CMPTR SYSTEM DISCRETE I/O SYS 1</title>
-//<sheet key="W0438533" chg="R" revdate="20081201" chapnbr="22" gnbr="d40501_317_ce" gtype="SS" pagenbr="159" sectnbr="11" sheetnbr="01" subjnbr="23">
-//<effect effrg="549549 559559" />
-//<title>D40501/317/CE</title></sheet></graphic>
-//<effect effrg="549549 559559">
-//    <title>FLIGHT CONT CMPTR SYSTEM DISCRETE I/O SYS 1</title>
-//    <sheet key="W0451848" chg="N" revdate="20081201" chapnbr="22" gnbr="21221123_041_b" gtype="SS" pagenbr="159" schemnbr="01" sectnbr="11" sheetnbr="01" subjnbr="23">
-//    <effect>
-//    <sbeff effrg="549549 559559" sbcond="POST" sbnbr="SBF100-22-050" />
-//    </effect>
-//<title>21221123/041/B</title></sheet>
-//</effect>
-//</subject>
-        scala.xml.XML.saveFull( "/Users/soemirno/Desktop/fixed.xml",
-            AtaDocument.restoreRemovedGraphics(wmDoc), "UTF-8", true, null)
-
-//        Console.println((wmDoc \\ "effect"))
-
-
-//        val distinctSbRule =  new RewriteRule {
-//           override def transform(n: Node) = n match {
-//              case e: Elem if (e \ "@chg" == "D") => {
-//                  Console.println(e \ "@key")
-//                  e
-//                }
-//              case n => n
-//          }
-//        }
-//        val n = new RuleTransformer(distinctSbRule).transform(LOGGER.info("Finished converting: " + filename))
-
-
-        LOGGER.info("Finished converting: " + filename)
+        LOGGER.info("Starting adding breaks: " + sourceFile)
+        scala.xml.XML.saveFull(tempFile, AtaDocument.addLineBreakAfterGraphic(xml.XML.loadFile( sourceFile)), "UTF-8", true, null)
+        LOGGER.info("Restoring graphics: " + tempFile)
+        scala.xml.XML.saveFull(outputFile, AtaDocument.restoreRemovedGraphics(xml.XML.loadFile( tempFile),returnedElements), "UTF-8", true, null)
+        LOGGER.info("Finished converting to: " + outputFile)
 
     }
 

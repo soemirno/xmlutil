@@ -1,7 +1,8 @@
 package net.soemirno.xmlUtil
 
+import _root_.scala.xml._
+import _root_.scala.xml.PCData
 import _root_.scala.xml.transform.{RuleTransformer, RewriteRule}
-import _root_.scala.xml.{Elem, NodeSeq, Node, PrettyPrinter}
 import org.slf4j.{Logger, LoggerFactory}
 import xml.Utility.trim
 
@@ -11,25 +12,73 @@ import xml.Utility.trim
 object AtaDocument {
     val logger = LoggerFactory.getLogger(this.getClass)
 
-    def restoreRemovedGraphics(wm: Elem): Elem = {
+    def restoreRemovedGraphics(wm: Node, returnedElements :NodeSeq): Elem = {
+
+        val restoreRemovedRule = new RewriteRule {
+            override def transform(n: Node) = n match {
+               case e: Elem if (e.label == "effect" && e.child.length>1 && e.child(1).label == "title") =>{
+                   logger.info("fix effect element")
+                   val effect :Elem = Elem(e.prefix, e.label, e.attributes, e.scope, NodeSeq.Empty : _*)
+                   val child :NodeSeq =  effect :: e.child.toList.tail
+
+                   val sheet = e \ "sheet"
+                   logger.info("looking for parent of sheet " + (sheet \"@key").text)                   
+                   val parent = findGraphic(returnedElements.toList, sheet ).first
+                   logger.info("found parent " + (parent \"@key").text)
+
+                   val change = new UnprefixedAttribute("chg",sheet \"@chg", xml.Null)
+                   val revdate = new UnprefixedAttribute("revdate",sheet \"@revdate", xml.Null)
+                   val attributes = parent.attributes.
+                            remove("chg").
+                            remove("revdate").
+                            append(change).
+                            append(revdate)
+
+                   Elem(parent.prefix, parent.label, attributes, e.scope, child : _*)
+                }
+               case _ => n
+            }
+        }
 
         val n = new RuleTransformer(restoreRemovedRule).transform(wm)
         Elem(wm.prefix, wm.label, wm.attributes, wm.scope, n.first.child.toList: _*)
 
     }
 
-    /**
-     *  rewrite rule to ensure unique sb in element
-     */
-    val restoreRemovedRule = new RewriteRule {
-        override def transform(n: Node) = n match {
-            case e: Elem if (e.label == "effect" && e.child.length>1 && e.child(1).label == "title") => {
-                val effect = Elem(e.prefix, e.label, e.attributes, e.scope, null : _*)
-                val child = e.child.toList.tail
-                Elem(null, "graphic", null, e.scope, child : _*)
+    def findGraphic(list :List[Node], sheet :NodeSeq ):List[Node] ={
+        val head = list.head
+        if ((head \\ "sheet" \ "@schemnbr").text == (sheet \"@schemnbr").text
+                && (head \\ "sheet" \ "@pagenbr").text == (sheet \"@pagenbr").text
+                && (head \\ "sheet" \ "@chapnbr").text == (sheet \"@chapnbr").text
+                && (head \\ "sheet" \ "@sectnbr").text == (sheet \"@sectnbr").text
+                && (head \\ "sheet" \ "@subjnbr").text == (sheet \"@subjnbr").text
+        )
+            List(head)
+        else
+            findGraphic(list.tail, sheet)        
+    }
+
+    def addLineBreakAfterGraphic(wm: Node): Elem = {
+
+        val addLineBreakAfterGraphicRule = new RewriteRule {
+        val break :Node =
+(<root>
+<test></test>
+<test></test>
+</root>).child.toList.first
+            override def transform(n: Node) = n match {                
+                case e: Elem if (e.label == "graphic") => {
+                    if ((e \ "@chapnbr").text > "20")
+                        List(e, break)
+                    else
+                        e
+                }
+                case _ => n
             }
-            case n => n
         }
+
+        val n = new RuleTransformer(addLineBreakAfterGraphicRule).transform(wm)
+        Elem(wm.prefix, wm.label, wm.attributes, wm.scope, n.first.child.toList: _*)
     }
 
     /**
