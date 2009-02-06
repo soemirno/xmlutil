@@ -47,45 +47,26 @@ object mergeDuplicatesSpec extends Specification {
   }
 
   "should read files from list" in {
-    LOGGER.info("test")
-    for (filename :String <- Source.fromFile("/Users/soemirno/F27_FSB_in_proof_final.txt").getLines)
+    val fileList =  "/tmp/F28_FSB_in_proof_final.txt"
+    LOGGER.info("reading " + fileList)
+    for (filename :String <- Source.fromFile(fileList).getLines)
         convertFile(filename.trim)
   }
-
 
   def convertFile(filename :String) = {
       LOGGER.info("Starting converting: " + filename)
       if (new java.io.File("/tmp/new/" + filename).exists) {
+
           val loadnode = xml.XML.loadFile("/tmp/new/" + filename)
           scala.xml.XML.saveFull("/tmp/temp/" + filename, loadnode, "UTF-8", true, null)
+
           val loadReversNode = xml.XML.loadFile("/tmp/temp/" + filename)
-          scala.xml.XML.saveFull("/tmp/converted/" + filename,
-              AtaDocument.removeDuplicateSbFromFigure(loadReversNode), "UTF-8", true, null)
-           LOGGER.info("Finished converting: " + filename)
+
+          scala.xml.XML.saveFull("/tmp/converted/" + filename, AtaDocument.removeDuplicateSbFromFigure(loadReversNode), "UTF-8", true, null)
+
+          LOGGER.info("Finished converting: " + filename)
       } else
-          LOGGER.error("=============>" + filename + " does not exists")
-
-  }
-  val listWithDuplicates = List(1, 1, 2, 2, 3, 4, 4)
-
-  def normalizeList(list: List[int]): List[int] =
-    {
-      if (list.length == 1 || list.isEmpty)
-        list
-      else {
-        if (list.head == list.tail.head) {
-          list.head :: normalizeList(list.tail.tail)
-        } else {
-          list.head :: normalizeList(list.tail)
-        }
-      }
-    }
-
-  "normalized list contains 4 items" in {
-    (normalizeList(listWithDuplicates)).size must_== 4
+          LOGGER.error(filename + " does not exists")
   }
 
-  "normalized list has '3' as third element" in {
-    (normalizeList(listWithDuplicates))(2) must_== 3
-  }
 }

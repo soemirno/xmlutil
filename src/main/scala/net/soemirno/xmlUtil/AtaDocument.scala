@@ -12,17 +12,36 @@ import xml.Utility.trim
 object AtaDocument {
     val logger = LoggerFactory.getLogger(this.getClass)
 
-    def restoreRemovedGraphics(wm: Node, returnedElements :NodeSeq): Elem = {
+    def findDeletedKeys(previousRevision :Elem): Seq[String] = {
+        logger.info("retrieving previous deleted graphics")
+        for( val graphic <- previousRevision \\ "graphic" if graphic \ "@chg" == "D" )
+            yield (graphic \ "@key").text
+    }
+
+  def findReturnedElements(unrevised :Elem, deletedKeys :Seq[String]): NodeSeq ={
+      logger.info("finding returned element")
+      for (val returned <- unrevised \\ "graphic" if (deletedKeys.contains((returned \"@key").text)))
+          yield (returned)
+  }
+
+    def restoreRemovedGraphics(wm: Node, returnedElements :NodeSeq, returnedSheetElements :scala.collection.mutable.Map [String, Node]): Elem = {
 
         val restoreRemovedRule = new RewriteRule {
             override def transform(n: Node) = n match {
-               case e: Elem if (e.label == "effect" && e.child.length>1 && e.child(1).label == "title") =>{
-                   logger.info("fix effect element")
+               case e: Elem if (e.label == "graphic" && returnedSheetElements.keySet.contains((e \ "@key").text)) =>{
+                  returnedSheetElements((e \ "@key").text)
+               }
+               case e: Elem if (e.label == "effect" && (e \ "sheet").length > 0) =>{
+                   logger.info("fix effect element for graphic")
                    val effect :Elem = Elem(e.prefix, e.label, e.attributes, e.scope, NodeSeq.Empty : _*)
                    val child :NodeSeq =  effect :: e.child.toList.tail
-
-                   val sheet = e \ "sheet"
-                   logger.info("looking for parent of sheet " + (sheet \"@key").text)                   
+                   val sheet = {
+                        if ((e \ "sheet").length == 1 )
+                            (e \"sheet")
+                        else
+                            (e \"sheet").first
+                   }
+                   logger.info("looking for parent of sheet " + (sheet \"@key").text)                  
                    val parent = findGraphic(returnedElements.toList, sheet ).first
                    logger.info("found parent " + (parent \"@key").text)
 
@@ -36,6 +55,7 @@ object AtaDocument {
 
                    Elem(parent.prefix, parent.label, attributes, e.scope, child : _*)
                 }
+
                case _ => n
             }
         }
@@ -45,28 +65,81 @@ object AtaDocument {
 
     }
 
+    def findSheet(list :List[Node], effect :NodeSeq ):List[Node] ={
+        val head =
+        try {
+              list.head
+        } catch {
+             case e: Exception =>{
+                Console.println(list)
+                Console.println(effect)
+                throw e
+             }
+        }
+
+        if ((head \ "title").text == (effect \  "title").text && (head \ "effect" \ "@effrg").text == (effect \  "@effrg").text){
+            if ((head \"effect" \ "sbeff").length == 1 ){
+                if ( (effect \ "sbeff" \ "@effrg").text != (head \"effect" \ "sbeff" \ "@effrg").text){
+                    return findSheet(list.tail, effect)
+                } else {
+                    return List(head)                    
+                }
+            }
+            if ((head \"effect" \ "sbeff").length > 1 ){
+                val sbnbr = ((head \"effect" \ "sbeff").first \ "@sbnbr").text
+                if ( !(effect \ "sbeff" \"@sbnbr" ).text.equals(sbnbr)){
+                    return findSheet(list.tail, effect)
+                } else {
+                    return List(head)
+                }
+            }
+
+            return List(head)
+        }
+        else
+            return findSheet(list.tail, effect)        
+    }
     def findGraphic(list :List[Node], sheet :NodeSeq ):List[Node] ={
-        val head = list.head
-        if ((head \\ "sheet" \ "@schemnbr").text == (sheet \"@schemnbr").text
-                && (head \\ "sheet" \ "@pagenbr").text == (sheet \"@pagenbr").text
-                && (head \\ "sheet" \ "@chapnbr").text == (sheet \"@chapnbr").text
-                && (head \\ "sheet" \ "@sectnbr").text == (sheet \"@sectnbr").text
-                && (head \\ "sheet" \ "@subjnbr").text == (sheet \"@subjnbr").text
+        val head =
+        try {
+              list.head
+        } catch {
+             case e: Exception =>{
+                Console.println(list)
+                Console.println(sheet)
+                throw e
+             }
+        }
+        val compareSheet = {
+            if ((head \ "sheet" ). length == 1) 
+                (head \ "sheet" )
+            else
+                (head \ "sheet" ).first
+        }
+        if ((compareSheet \ "@schemnbr").text == (sheet \"@schemnbr").text
+                && (compareSheet \ "@pagenbr").text == (sheet \"@pagenbr").text
+                && (compareSheet \ "@chapnbr").text == (sheet \"@chapnbr").text
+                && (compareSheet \ "@sectnbr").text == (sheet \"@sectnbr").text
+                && (compareSheet \ "@subjnbr").text == (sheet \"@subjnbr").text
         )
             List(head)
-        else
-            findGraphic(list.tail, sheet)        
+        else {
+            findGraphic(list.tail, sheet)
+        }
     }
 
     def addLineBreakAfterGraphic(wm: Node): Elem = {
-
+        val break :Node = Text("\n")
         val addLineBreakAfterGraphicRule = new RewriteRule {
-        val break :Node =
-(<root>
-<test></test>
-<test></test>
-</root>).child.toList.first
-            override def transform(n: Node) = n match {                
+
+            val space :Node =
+    (<root> <test></test> <test></test></root>).child.toList.first
+
+            override def transform(n: Node) = n match {
+                case e: Elem if (e.label == "title") => {
+                    Elem(e.prefix, e.label, e.attributes, e.scope, e.child: _*)
+                }
+
                 case e: Elem if (e.label == "graphic") => {
                     if ((e \ "@chapnbr").text > "20")
                         List(e, break)
