@@ -46,13 +46,6 @@ object mergeDuplicatesSpec extends Specification {
     (AtaDocument.removeDuplicateSbFromFigure(ipcItem) \\ "sbcdata" \\ "@effrg").text must_== "097097 099099"
   }
 
-  "should read files from list" in {
-    val fileList =  "/tmp/F28_FSB_in_proof_final.txt"
-    LOGGER.info("reading " + fileList)
-    for (filename :String <- Source.fromFile(fileList).getLines)
-        convertFile(filename.trim)
-  }
-
   def convertFile(filename :String) = {
       LOGGER.info("Starting converting: " + filename)
       if (new java.io.File("/tmp/new/" + filename).exists) {
