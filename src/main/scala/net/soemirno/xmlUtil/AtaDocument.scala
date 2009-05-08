@@ -19,6 +19,39 @@ class CustomRuleTransformer(rules: RewriteRule*) extends CustomBasicTransformer 
   }
 }
 
+object WmFixer {
+    val logger = LoggerFactory.getLogger(this.getClass)
+    def main(args: Array[String]) {
+        if (args.size != 4) {
+          Console.println("Invalid number of arguments.")
+          Console.println("java -Xmx2048m -jar xmlUtil-1.0.0-jar-with-dependencies.jar /pub/folder 50 20090601 20090301")
+          return
+        }
+        val pub_folder = args(0)
+        val aircraft = args(1)
+        val revision =  args(2)
+        val previous_revision = args(3)
+
+        logger.info("Start fixing wm document for F" + aircraft)
+        logger.info("Publication folder is: " + pub_folder)
+        logger.info("Revision is: " + revision)
+        logger.info("Previous revison is: " + previous_revision)
+
+        val deletedKeys = AtaDocument.findDeletedKeys(xml.XML.loadFile(pub_folder + aircraft + "/wm/_shadowfolder/" + previous_revision + "-finalprint-ata2100.xml"), "graphic")
+        val deletedSheetKeys = AtaDocument.findDeletedKeys(xml.XML.loadFile(pub_folder + aircraft + "/wm/_shadowfolder/" + previous_revision + "-finalprint-ata2100.xml"), "sheet")
+
+        val returnedElements = AtaDocument.findReturnedElements(xml.XML.loadFile(pub_folder + aircraft +  "/wm/_unrevised.xml"), deletedKeys)
+        val returnedSheetElements = AtaDocument.findReturnedSheetElements(xml.XML.loadFile(pub_folder + aircraft +  "/wm/_unrevised.xml"), deletedSheetKeys)
+
+        val sourceFile = pub_folder + aircraft + "/wm/" + revision + ".xml"
+        val outputFile = pub_folder + "/fixed.xml"
+
+        val fixedReturnedSheetElements = AtaDocument.fixReturnedSheetElements(xml.XML.loadFile(sourceFile), returnedSheetElements )
+
+        logger.info("Restoring graphics: " + sourceFile)
+        scala.xml.XML.saveFull(outputFile, AtaDocument.restoreRemovedGraphics(xml.XML.loadFile( sourceFile),returnedElements, fixedReturnedSheetElements), "UTF-8", true, null)
+        logger.info("Finished converting to: " + outputFile)    }
+  }
 /**
  * Ata specific scripts
  */
@@ -46,6 +79,16 @@ object AtaDocument {
       if (matchedKeys.length > 0)
     } yield returned
   }
+
+  def findReturnedSheetElements(unrevised :Elem, deletedKeys :Seq[String]): NodeSeq ={
+        logger.info("finding returned sheet element")
+        for (val returned <- unrevised \\ "graphic"
+             if (deletedKeys.contains((returned \"sheet" \"@key").text)
+                     || (deletedKeys.contains(((returned \"sheet").first \ "@key").text))
+                     || ((returned \"sheet").length == 2 && deletedKeys.contains(((returned \"sheet")(1) \ "@key").text ))))
+        yield (returned)
+
+    }
 
   def fixReturnedSheetElements( revised: Elem, returnedSheetElements : NodeSeq): Map [String, Node] = {
     logger.info("fixing returned sheets")
@@ -205,10 +248,9 @@ object AtaDocument {
      * make sure no duplicate sb exists in list
      */
     def listWithUniqueSb(list: List[Node]): List[Node] = {
-        if (list.length < 2)
-            list
-        else
-            list.head :: listWithUniqueSb(trimmedSbTail(list))
+        if (list.length <= 1) return list
+
+        list.head :: listWithUniqueSb(trimmedSbTail(list))
     }
 
     /**
@@ -217,11 +259,7 @@ object AtaDocument {
     def trimmedSbTail(list: List[Node]) = {
         val trimmedTail = trimmedPcDataTail(list)
 
-        val tailStartsWithSameSb =
-        list.head.label == "sbcdata" && !trimmedTail.isEmpty &&
-                (list.head \ "sbc" \ "@chgnbr") == (trimmedTail.head \ "sbc" \ "@chgnbr")
-
-        if (tailStartsWithSameSb) {
+        if (startsWithSameSb(list, trimmedTail)) {
             logChanges(list.head, trimmedTail.head)
             trimmedTail.tail
         }
@@ -229,6 +267,10 @@ object AtaDocument {
             list.tail
     }
 
+    def startsWithSameSb(firstList: List[Node], secondList: List[Node]) = {
+      firstList.head.label == "sbcdata" && !secondList.isEmpty &&
+              (firstList.head \ "sbc" \ "@chgnbr") == (secondList.head \ "sbc" \ "@chgnbr")
+    }
     /**
      * ignore whitespace between elements
      */
